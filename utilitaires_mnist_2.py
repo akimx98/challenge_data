@@ -15,7 +15,7 @@ from tqdm.notebook import tqdm
 plt.rcParams['figure.dpi'] = 150
 
 # Téléchargement et extraction des inputs contenus dans l'archive zip
-inputs_zip_url = "https://github.com/akimx98/challenge_data/raw/main/input_mnist_2_10.zip"
+inputs_zip_url = "https:/raw.githubusercontent.com/akimx98/challenge_data/raw/main/input_mnist_2_10.zip"
 inputs_zip = requests.get(inputs_zip_url)
 zf = ZipFile(BytesIO(inputs_zip.content))
 zf.extractall()
