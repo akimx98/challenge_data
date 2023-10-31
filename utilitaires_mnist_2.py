@@ -1,6 +1,6 @@
 # Import des librairies utilisées dans le notebook
 #import basthon
-#import requests
+import requests
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -15,7 +15,7 @@ from tqdm.notebook import tqdm
 plt.rcParams['figure.dpi'] = 150
 
 # Téléchargement et extraction des inputs contenus dans l'archive zip
-inputs_zip_url = "https://raw.githubusercontent.com/challengedata/challenge_educatif_mnist/main/inputs.zip"
+inputs_zip_url = "https://github.com/akimx98/challenge_data/raw/main/input_mnist_2_10.zip"
 inputs_zip = requests.get(inputs_zip_url)
 zf = ZipFile(BytesIO(inputs_zip.content))
 zf.extractall()
@@ -42,27 +42,63 @@ _, y_train_10 = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
                                 dtype=int, delimiter=',')[:,k] for k in [0,1]]
 
 # MNIST-2
-
-chiffre_1 = 1
-chiffre_2 = 6
+chiffre_1 = 2
+chiffre_2 = 7
 chiffres = [chiffre_1, chiffre_2]
 
-# Trouver les indices des étiquettes qui valent 0 ou 1
-indices = np.where((y_train_10 == chiffre_1) | (y_train_10 == chiffre_2))
+# Inputs
+with open('mnist_2_x_train.pickle', 'rb') as f:
+    ID_train_2, x_train_2 = pickle.load(f).values()
+
+with open('mnist_2_x_test.pickle', 'rb') as f:
+    ID_test_2, x_test_2 = pickle.load(f).values()
+
+# Outputs
+y_train_2 = y_train_10[np.isin(y_train_10, chiffres)]
+
+# Ici le x_train c'est celui de MNIST-2
 
 # Utiliser ces indices pour extraire les images correspondantes de x_train_10
-x_train = x_train_10[indices]
-y_train = y_train_10[indices]
+x_train = x_train_2
+y_train_chiffres = y_train_2.copy()
+y_train = y_train_2.copy()
 
 # classe : -1/1
-y_train[y_train == 1] = -1
-y_train[y_train == 6] = 1
+y_train[y_train_chiffres == chiffre_1] = -1
+y_train[y_train_chiffres == chiffre_2] = 1
 
 N = len(x_train)
 
 x_train_par_population = [x_train[y_train==k] for k in chiffres]
 
 x = x_train[0,:,:]
+
+# Erreurs
+# Fonction qui calcule l'erreur pour une image x, en fonction de la réponse y et du paramètre s
+def erreur_image(x, y, s):
+    global caracteristique
+    c = caracteristique(x)
+    y_est = classification(x, s)
+    
+    if y_est == y:
+        erreur = 0
+    else:
+        erreur = 1
+        
+    return erreur
+
+# Fonction qui calcule la moyenne des erreur par image pour donner l'erreur d'entrainement
+def erreur_train(x_train, y_train, s):
+    liste_erreurs = []
+
+    for i in range(N):
+        x = x_train[i]
+        y = y_train[i]
+        
+        erreur = erreur_image(x, y, s)
+        liste_erreurs.append(erreur)
+        
+    return moyenne(liste_erreurs)
 
 def visualiser_scatter_2d_mnist_2(c_train):
     #digits = [0,1]
@@ -155,14 +191,21 @@ def affichage(image):
     plt.show()
     plt.close()
 
-# Affichage de dix images
+# Affichage 10 avec les valeurs de y en dessous
 def affichage_dix(images):
-    fig, ax = plt.subplots(1, 10, figsize=(10,1))
+    global y_train
+    fig, ax = plt.subplots(1, 10, figsize=(10, 1))
+    
+    # Cachez les axes des subplots
+    for j in range(10):
+        ax[j].axis('off')
+        ax[j].imshow(images[j], cmap='gray')
+    
+    # Affichez les classes
     for k in range(10):
-        ax[k].imshow(images[k], cmap='gray')
-        ax[k].set_xticks([])
-        ax[k].set_yticks([])
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0.05, hspace=0.05)
+        fig.text((k+0.5)/10, 0, '$y = $'+str(y_train[k]), va='top', ha='center', fontsize=12)
+    
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0.2, wspace=0.05, hspace=0)
     plt.show()
     plt.close()
 
@@ -487,13 +530,13 @@ def tracer_erreur(s_min, s_max, pas, func_classif):
     scores_list = []
     for s in tqdm(range(s_min, s_max, pas), desc='En cours de calcul... ', leave=True):
         y_est_train = []
-        for x in x_train[::2]:
+        for x in x_train[::4]:
             y_est_train.append(func_classif(x, s))
         scores_list.append(score(y_est_train, y_train[::2]))
 
     fig, ax1 = plt.subplots(figsize=(7, 4))
     ax1.scatter(np.arange(s_min, s_max, pas), scores_list, marker='+', zorder=3)
-    ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 1 & 6")
+    ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
     ax1.set_ylim(ymin=0, ymax=0.7)
     ax1.set_xticks(np.arange(s_min, s_max, 5*pas))
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
