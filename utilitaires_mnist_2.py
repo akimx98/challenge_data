@@ -1,5 +1,5 @@
 # Import des librairies utilisées dans le notebook
-import basthon
+#import basthon
 import requests
 import numpy as np
 import matplotlib.pyplot as plt
@@ -544,7 +544,7 @@ def tracer_erreur(t_min, t_max, func_classif):
     pas_t = 2
     pas_x = 4
     scores_list = []
-    for t in tqdm(range(t_min, t_max, pas_t), desc='En cours de calcul... ', leave=True):
+    for t in range(t_min, t_max, pas_t):
         e_train = erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
         scores_list.append(e_train)
 
@@ -559,6 +559,26 @@ def tracer_erreur(t_min, t_max, func_classif):
     plt.tight_layout()
     plt.show()
     plt.close()
+    
+# def tracer_erreur(t_min, t_max, func_classif):
+#     pas_t = 2
+#     pas_x = 4
+#     scores_list = []
+#     for t in tqdm(range(t_min, t_max, pas_t), desc='En cours de calcul... ', leave=True):
+#         e_train = erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
+#         scores_list.append(e_train)
+
+#     fig, ax1 = plt.subplots(figsize=(7, 4))
+#     ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
+#     ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
+#     ax1.set_ylim(ymin=0, ymax=0.7)
+#     ax1.set_xticks(np.arange(t_min, t_max, 2*pas_t))
+#     ax1.xaxis.set_minor_locator(AutoMinorLocator())
+#     ax1.yaxis.set_minor_locator(AutoMinorLocator())
+#     plt.grid(which='both', linestyle='--', linewidth=0.5)
+#     plt.tight_layout()
+#     plt.show()
+#     plt.close()
 
 # def tracer_erreur(s_min, s_max, pas, func_classif):
 #     scores_list = []
