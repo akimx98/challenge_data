@@ -1,5 +1,5 @@
 # Import des librairies utilisées dans le notebook
-import basthon
+#import basthon
 import requests
 import numpy as np
 import matplotlib.pyplot as plt
@@ -60,6 +60,7 @@ y_train_2 = y_train_10[np.isin(y_train_10, chiffres)]
 
 # Utiliser ces indices pour extraire les images correspondantes de x_train_10
 x_train = x_train_2
+x_test = x_test_2
 y_train_chiffres = y_train_2.copy()
 y_train = y_train_2.copy()
 
@@ -73,10 +74,23 @@ x_train_par_population = [x_train[y_train==k] for k in chiffres]
 
 x = x_train[0,:,:]
 
+# Calculer l'estimation et l'erreur : 
+def erreur_train(x_train, y_train, t, classification):
+    n = len(x_train)
+    y_train_est = []
+    for i in range(n):
+        x = x_train[i]
+        y = y_train[i]
+        y_train_est.append(classification(x, t))
+    
+    return np.mean(np.array(y_train_est) != np.array(y_train))
+        
+        
+
 # Erreurs
 # Fonction qui calcule l'erreur pour une image x, en fonction de la réponse y et du paramètre s
 def erreur_image(x, y, s):
-    global caracteristique
+    global caracteristique, classification, N
     c = caracteristique(x)
     y_est = classification(x, s)
     
@@ -88,7 +102,7 @@ def erreur_image(x, y, s):
     return erreur
 
 # Fonction qui calcule la moyenne des erreur par image pour donner l'erreur d'entrainement
-def erreur_train(x_train, y_train, s):
+def erreur_train_bis(x_train, y_train, s):
     liste_erreurs = []
 
     for i in range(N):
@@ -526,19 +540,19 @@ def score(y_est, y_vrai):
 # Pour tracer la fonction erreur
 from matplotlib.ticker import AutoMinorLocator
 
-def tracer_erreur(s_min, s_max, pas, func_classif):
+def tracer_erreur(t_min, t_max, func_classif):
+    pas_t = 2
+    pas_x = 4
     scores_list = []
-    for s in tqdm(range(s_min, s_max, pas), desc='En cours de calcul... ', leave=True):
-        y_est_train = []
-        for x in x_train[::4]:
-            y_est_train.append(func_classif(x, s))
-        scores_list.append(score(y_est_train, y_train[::2]))
+    for t in tqdm(range(t_min, t_max, pas_t), desc='En cours de calcul... ', leave=True):
+        e_train = erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
+        scores_list.append(e_train)
 
     fig, ax1 = plt.subplots(figsize=(7, 4))
-    ax1.scatter(np.arange(s_min, s_max, pas), scores_list, marker='+', zorder=3)
+    ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
     ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
     ax1.set_ylim(ymin=0, ymax=0.7)
-    ax1.set_xticks(np.arange(s_min, s_max, 5*pas))
+    ax1.set_xticks(np.arange(t_min, t_max, 2*pas_t))
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.yaxis.set_minor_locator(AutoMinorLocator())
     plt.grid(which='both', linestyle='--', linewidth=0.5)
