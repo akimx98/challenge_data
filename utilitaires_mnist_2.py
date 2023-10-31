@@ -23,7 +23,7 @@ zf.close()
 
 
 # Téléchargement des outputs d'entraînement de MNIST-10 contenus dans le fichier y_train_10.csv
-output_train_url = "https://raw.githubusercontent.com/challengedata/challenge_educatif_mnist/main/y_train_10.csv"
+output_train_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/y_train_10.csv"
 output_train = requests.get(output_train_url)
 
 # Création des variables d'inputs, outputs et indices pour les datasets MNIST-2, MNIST-4 et MNIST-10
