@@ -1,5 +1,5 @@
 # Import des librairies utilisées dans le notebook
-import basthon
+#import basthon
 import requests
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,8 +9,7 @@ from io import BytesIO, StringIO
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
-#from tqdm.notebook import tqdm
-
+from tqdm.notebook import tqdm
 
 plt.rcParams['figure.dpi'] = 150
 
@@ -45,6 +44,7 @@ _, y_train_10 = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
 chiffre_1 = 2
 chiffre_2 = 7
 chiffres = [chiffre_1, chiffre_2]
+classes = [-1,1]
 
 # Inputs
 with open('mnist_2_x_train.pickle', 'rb') as f:
@@ -70,7 +70,7 @@ y_train[y_train_chiffres == chiffre_2] = 1
 
 N = len(x_train)
 
-x_train_par_population = [x_train[y_train==k] for k in chiffres]
+x_train_par_population = [x_train[y_train==k] for k in classes]
 
 x = x_train[0,:,:]
 
@@ -84,7 +84,6 @@ def erreur_train(x_train, y_train, t, classification):
         y_train_est.append(classification(x, t))
     
     return np.mean(np.array(y_train_est) != np.array(y_train))
-        
         
 
 # Erreurs
@@ -114,67 +113,92 @@ def erreur_train_bis(x_train, y_train, s):
         
     return moyenne(liste_erreurs)
 
-def visualiser_scatter_2d_mnist_2(c_train):
-    #digits = [0,1]
+def visualiser_scatter_2d_mnist_2(c_train, avec_centroides = False):
     nb_digits = len(chiffres)
-    c_train_par_population = [np.array(c_train)[y_train==k] for k in chiffres]
+    c_train_par_population = [np.array(c_train)[y_train==k] for k in classes]
 
-    # Moyennes
-    #N = [len(c_train_par_population[i][:,0]) for i in range(nb_digits)]
-    #M_x = [sum(c_train_par_population[i][:,0])/N[i] for i in range(nb_digits)]
-    #M_y = [sum(c_train_par_population[i][:,1])/N[i] for i in range(nb_digits)]
-
-    # Quatre premières couleurs par défaut de Matplotlib
+    # Deux premières couleurs par défaut de Matplotlib
     colors = ['C0', 'C1']
     
     maxs_ = np.concatenate(c_train_par_population).max(axis=0)
     mins_ = np.concatenate(c_train_par_population).min(axis=0)
-    fig, ax = plt.subplots(figsize=(7,7))
+    
+    fig, ax = plt.subplots(figsize=(6,6))
     for i in range(nb_digits):  # ordre inversé pour un meilleur rendu
         ax.scatter(c_train_par_population[i][:,0], c_train_par_population[i][:,1], marker = '+', s = 20, c=colors[i], linewidth=0.5)
 
-        
-    #ax.set_xlim((0, maxs_[0]))
-    #ax.set_ylim((0, maxs_[1]))
+    # Définir les borne inf et sup des axes. On veut que le point (0,0) soit toujours sur le graphe
+    x_min, x_max = min(0, mins_[0]), max(0, maxs_[0])
+    y_min, y_max = min(0, maxs_[1]), max(0, maxs_[1])
+    ax.set_xlim((x_min, x_max))
+    ax.set_ylim((y_min, y_max))
     
-    #for i in range(nb_digits):
-        #ax.scatter(M_x[i], M_y[i], marker = 'o', s = 70, edgecolor='black', linewidth=1.5, c=colors[i])
+    # Afficher les centroides
+    if avec_centroides:
+        # Moyennes
+        N_ = [len(c_train_par_population[i][:,0]) for i in range(nb_digits)]
+        M_x = [sum(c_train_par_population[i][:,0])/N_[i] for i in range(nb_digits)]
+        M_y = [sum(c_train_par_population[i][:,1])/N_[i] for i in range(nb_digits)]
+        for i in range(nb_digits):
+            ax.scatter(M_x[i], M_y[i], marker = 'o', s = 70, edgecolor='black', linewidth=1.9, c=colors[i])
 
-    patches = [mpatches.Patch(color=colors[i], label=chiffres[i]) for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label="$\hat y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
+    
+    # Enlever les axes de droites et du haut
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    # Centrer les axes en (0,0)
+    ax.spines['left'].set_position(('data', 0))
+    ax.spines['bottom'].set_position(("data", 0))
+
+    
+    #Afficher les flèches au bout des axes
+    ax.plot(1, 0, ">k", transform=ax.get_yaxis_transform(), clip_on=False)
+    ax.plot(0, 1, "^k", transform=ax.get_xaxis_transform(), clip_on=False)   
+    
+    # Nom des axex
+    ax.set_xlabel('$k_1$', loc='right')
+    ax.set_ylabel('$k_2$', loc='top', rotation='horizontal')
     
     #plt.savefig('hist_2d_MNIST2.png', dpi = 300)
     plt.show()
     plt.close()
 
-def erreur_lineaire(m, p):
-    liste_erreurs = []
+def erreur_lineaire(m, p, c_train, y_train):
+    y_est_train = np.sign(m * c_train[:, 0] - c_train[:, 1] + p)
+    erreurs = (y_est_train != y_train).astype(int)
+    return np.mean(erreurs)
 
-    # On remplit y_est_train à l'aide d'une boucle :
-    for i in range(N):
-        x = x_train[i]
-        y = y_train[i]
-        x_1, x_2 = deux_caracteristiques(x)
-        y_est = classificateur(m, p, x_1, x_2)
+# def erreur_lineaire(m, p,c_train):
+#     liste_erreurs = []
 
-        if y_est == y:
-            erreur = 0
-        else:
-            erreur = 1
+#     # On remplit y_est_train à l'aide d'une boucle :
+#     for i in range(N):
+#         x = x_train[i]
+#         y = y_train[i]
+#         x_1, x_2 = c_train[i]
+#         y_est = classificateur(m, p, x_1, x_2)
 
-        liste_erreurs.append(erreur)
+#         if y_est == y:
+#             erreur = 0
+#         else:
+#             erreur = 1
 
-    return np.mean(liste_erreurs)
+#         liste_erreurs.append(erreur)
 
-def tracer_separatrice(m, p):
+#     return np.mean(liste_erreurs)
+
+def tracer_separatrice(m, p, c_train):
     nb_digits = len(chiffres)
-    c_train_par_population = [np.array(c_train)[y_train==k] for k in chiffres]
+    c_train_par_population = [np.array(c_train)[y_train==k] for k in classes]
 
     colors = ['C0', 'C1']
 
     maxs_ = np.concatenate(c_train_par_population).max(axis=0)
     mins_ = np.concatenate(c_train_par_population).min(axis=0)
-    fig, ax = plt.subplots(figsize=(10,10))
+    fig, ax = plt.subplots(figsize=(6,6))
     for i in range(nb_digits):  
         ax.scatter(c_train_par_population[i][:,0], c_train_par_population[i][:,1], marker = '+', s = 20, c=colors[i], linewidth=0.5)
 
@@ -191,22 +215,27 @@ def tracer_separatrice(m, p):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-    patches = [mpatches.Patch(color=colors[i], label=chiffres[i]) for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label=classes[i]) for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
 
     plt.show()
     plt.close()
 
+def titre_image(rng):
+    titre = "y = "+str(y_train[rng])+" (chiffre = "+str(y_train_chiffres[rng])+")"
+    return titre
+
 
 # Affichage d'une image
-def affichage(image):
+def affichage(image, titre=""):
     fig, ax = plt.subplots(figsize=(2,2))
     ax.imshow(image, cmap='gray')
+    ax.set_title(titre)
     plt.show()
     plt.close()
 
 # Affichage 10 avec les valeurs de y en dessous
-def affichage_dix(images):
+def affichage_dix(images, liste_y = y_train):
     global y_train
     fig, ax = plt.subplots(1, 10, figsize=(10, 1))
     
@@ -216,8 +245,9 @@ def affichage_dix(images):
         ax[j].imshow(images[j], cmap='gray')
     
     # Affichez les classes
-    for k in range(10):
-        fig.text((k+0.5)/10, 0, '$y = $'+str(y_train[k]), va='top', ha='center', fontsize=12)
+    if liste_y is not None:
+        for k in range(10):
+            fig.text((k+0.5)/10, 0, '$y = $'+str(liste_y[k]), va='top', ha='center', fontsize=12)
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0.2, wspace=0.05, hspace=0)
     plt.show()
@@ -260,21 +290,55 @@ def sauver_et_telecharger_mnist_10(y_est_test, nom_du_fichier):
     basthon.download(nom_du_fichier)
 
 # Visualiser les histogrammes
-def visualiser_histogrammes_mnist_2(c_train):
-    digits = [0,1]
-    nb_digits = 2
+def visualiser_histogrammes_mnist_2(c_train, size='grand', legend_loc='upper right'):
+    if size == 'grand':
+        font_size = 14
+    elif size == 'petit':
+        font_size = 17
+    else:
+        raise ValueError("size doit valoir 'grand' ou 'petit'") 
+    
+    
+    nb_digits = len(chiffres)
+    c_train_par_population = [np.array(c_train)[y_train==k] for k in classes]
 
-    c_train_par_population = [np.array(c_train)[y_train_2==k] for k in digits]
+    # Deux premières couleurs par défaut de Matplotlib
+    colors = ['C0', 'C1']
 
+    fig, ax = plt.subplots(figsize=(8,5))
     # Visualisation des histogrammes
     for k in range(nb_digits):
-        plt.hist(c_train_par_population[k], bins=60, alpha=0.7, label=k, density = True)
+        ax.hist(c_train_par_population[k], bins=60, alpha=0.7, density = False, 
+                label="$y = $"+str(classes[k])+" (chiffre : "+str(chiffres[k])+")")
 
-    plt.gca().set_xlim(xmin=0)
-    plt.gca().set_title("Histogrammes de la caractéristique")
-    plt.legend(loc='upper right')
+    ax.set_xlim(xmin=0)
+    #ax.set_ylim(ymax = 395)
+    #ax.set_title("Histogrammes de la caractéristique")
+    ax.legend(loc=legend_loc, fontsize=font_size+2)
+    
+    # Font size pour les ticks
+    ax.tick_params(axis='both', labelsize=font_size)
+
+    # Enlever les axes de droites et du haut
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    # Centrer les axes en (0,0)
+    ax.spines['left'].set_position(('data', 0))
+    ax.spines['bottom'].set_position(("data", 0))
+
+    
+    #Afficher les flèches au bout des axes
+    ax.plot(1, 0, ">k", transform=ax.get_yaxis_transform(), clip_on=False)
+    ax.plot(0, 1, "^k", transform=ax.get_xaxis_transform(), clip_on=False)   
+    
+    # Nom des axex
+    ax.set_xlabel('$k$', loc='right', fontsize=font_size)
+    ax.set_ylabel('$h$ et $g$', loc='top', rotation='horizontal', fontsize=font_size)
+
     plt.show()
     plt.close()
+
 
 # Visualiser les histogrammes
 def visualiser_histogrammes_mnist_4(c_train_par_population):
@@ -545,13 +609,33 @@ def tracer_erreur(t_min, t_max, func_classif):
     pas_x = 4
     scores_list = []
     for t in range(t_min, t_max, pas_t):
-        e_train = erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
+        e_train = 100*erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
         scores_list.append(e_train)
 
     fig, ax1 = plt.subplots(figsize=(7, 4))
     ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
     ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
-    ax1.set_ylim(ymin=0, ymax=0.7)
+    ax1.set_ylim(ymin=0, ymax=70)
+    ax1.set_xticks(np.arange(t_min, t_max, 2*pas_t))
+    ax1.xaxis.set_minor_locator(AutoMinorLocator())
+    ax1.yaxis.set_minor_locator(AutoMinorLocator())
+    plt.grid(which='both', linestyle='--', linewidth=0.5)
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+def tracer_erreur_c_train(t_min, t_max, c_train):
+    pas_t = 2
+    pas_x = 4
+    scores_list = []
+    for t in range(t_min, t_max, pas_t):
+        e_train = 100*erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
+        scores_list.append(e_train)
+
+    fig, ax1 = plt.subplots(figsize=(7, 4))
+    ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
+    ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
+    ax1.set_ylim(ymin=0, ymax=70)
     ax1.set_xticks(np.arange(t_min, t_max, 2*pas_t))
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.yaxis.set_minor_locator(AutoMinorLocator())
@@ -612,7 +696,7 @@ def moyenne(liste):
     arr = np.array(liste)
     return np.mean(arr)
 
-def par_population(liste):
+def par_population_4(liste):
     chiffres = [0,1,4,8]
     # Créer une liste de liste qui divise par population, comme par exemple pour liste = c_train
     return [np.array(liste)[y_train_4==k] for k in chiffres]
@@ -621,8 +705,7 @@ def par_population_10(liste):
     # Créer une liste de liste qui divise par population, comme par exemple pour liste = c_train
     return [np.array(liste)[y_train_10==k] for k in range(10)]
 
-def par_population_mnist2(liste):
-    chiffres = [0,1]
+def par_population_mnist_2(liste):
     # Créer une liste de liste qui divise par population, comme par exemple pour liste = c_train
     return [np.array(liste)[y_train_2==k] for k in chiffres]
 
