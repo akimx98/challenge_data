@@ -1,5 +1,5 @@
 # Import des librairies utilisées dans le notebook
-#import basthon
+import basthon
 import requests
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ from io import BytesIO, StringIO
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
-from tqdm.notebook import tqdm
+#from tqdm.notebook import tqdm
 
 plt.rcParams['figure.dpi'] = 150
 
