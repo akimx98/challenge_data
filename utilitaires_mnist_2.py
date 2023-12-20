@@ -1,5 +1,6 @@
+# coding=utf-8
+
 # Import des librairies utilisées dans le notebook
-import basthon
 import requests
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,34 +12,44 @@ import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
 #from tqdm.notebook import tqdm
 
+# Import de Basthon : ne marche que si on est sur basthon ou capytale, sinon ignorer : 
+try:
+    import basthon
+except Exception: 
+    pass
+
 plt.rcParams['figure.dpi'] = 150
 
 # Téléchargement et extraction des inputs contenus dans l'archive zip
-inputs_zip_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/input_mnist_2_10.zip"
+inputs_zip_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/input_mnist_2.zip"
 inputs_zip = requests.get(inputs_zip_url)
 zf = ZipFile(BytesIO(inputs_zip.content))
 zf.extractall()
 zf.close()
 
 
-# Téléchargement des outputs d'entraînement de MNIST-10 contenus dans le fichier y_train_10.csv
-output_train_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/y_train_10.csv"
+# Téléchargement des outputs d'entraînement de MNIST-2 contenus dans le fichier y_train_2.csv
+output_train_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/y_train_2.csv"
 output_train = requests.get(output_train_url)
+
+output_train_chiffres_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/y_train_2_chiffres.csv"
+output_train_chiffres = requests.get(output_train_chiffres_url)
+
 
 # Création des variables d'inputs, outputs et indices pour les datasets MNIST-2, MNIST-4 et MNIST-10
 
-# MNIST-10
+# # MNIST-10
 
-# Inputs and indices
-with open('mnist_10_x_train.pickle', 'rb') as f:
-    ID_train_10, x_train_10 = pickle.load(f).values()
+# # Inputs and indices
+# with open('mnist_10_x_train.pickle', 'rb') as f:
+#     ID_train_10, x_train_10 = pickle.load(f).values()
 
-with open('mnist_10_x_test.pickle', 'rb') as f:
-    ID_test_10, x_test_10 = pickle.load(f).values()
+# with open('mnist_10_x_test.pickle', 'rb') as f:
+#     ID_test_10, x_test_10 = pickle.load(f).values()
 
-# Outputs
-_, y_train_10 = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
-                                dtype=int, delimiter=',')[:,k] for k in [0,1]]
+# # Outputs
+# _, y_train_10 = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
+#                                 dtype=int, delimiter=',')[:,k] for k in [0,1]]
 
 # MNIST-2
 chiffre_1 = 2
@@ -46,7 +57,7 @@ chiffre_2 = 7
 chiffres = [chiffre_1, chiffre_2]
 classes = [-1,1]
 
-# Inputs
+# # Inputs
 with open('mnist_2_x_train.pickle', 'rb') as f:
     ID_train_2, x_train_2 = pickle.load(f).values()
 
@@ -54,19 +65,15 @@ with open('mnist_2_x_test.pickle', 'rb') as f:
     ID_test_2, x_test_2 = pickle.load(f).values()
 
 # Outputs
-y_train_2 = y_train_10[np.isin(y_train_10, chiffres)]
+_, y_train = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
+                                dtype=int, delimiter=',')[:,k] for k in [0,1]]
+
+_, y_train_chiffres = [np.loadtxt(StringIO(output_train_chiffres.content.decode('utf-8')),
+                                dtype=int, delimiter=',')[:,k] for k in [0,1]]
 
 # Ici le x_train c'est celui de MNIST-2
-
-# Utiliser ces indices pour extraire les images correspondantes de x_train_10
 x_train = x_train_2
 x_test = x_test_2
-y_train_chiffres = y_train_2.copy()
-y_train = y_train_2.copy()
-
-# classe : -1/1
-y_train[y_train_chiffres == chiffre_1] = -1
-y_train[y_train_chiffres == chiffre_2] = 1
 
 N = len(x_train)
 
