@@ -10,12 +10,21 @@ from io import BytesIO, StringIO
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
-#from tqdm.notebook import tqdm
 
 # Import de Basthon : ne marche que si on est sur basthon ou capytale, sinon ignorer : 
 try:
     import basthon
-except Exception: 
+except ModuleNotFoundError: 
+    pass
+
+# Import du validation_kernel : ne marche que si fourni et si va avec le notebook en version séquencé. Sinon, ignorer :
+sequence = False
+
+try:
+    from validation_kernel import *
+    sequence = True
+except ModuleNotFoundError: 
+    sequence = False
     pass
 
 plt.rcParams['figure.dpi'] = 150
@@ -235,7 +244,7 @@ def titre_image(rng):
 
 # Affichage d'une image
 def affichage(image, titre=""):
-    fig, ax = plt.subplots(figsize=(2,2))
+    fig, ax = plt.subplots(figsize=(3,3))
     ax.imshow(image, cmap='gray')
     ax.set_title(titre)
     plt.show()
@@ -622,11 +631,29 @@ def tracer_erreur(t_min, t_max, func_classif):
     fig, ax1 = plt.subplots(figsize=(7, 4))
     ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
     ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
-    ax1.set_ylim(ymin=0, ymax=70)
+    ax1.set_ylim(ymin=0, ymax=68)
+    ax1.set_xlim(xmin=t_min, xmax=t_max+2)
     ax1.set_xticks(np.arange(t_min, t_max, 2*pas_t))
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.yaxis.set_minor_locator(AutoMinorLocator())
     plt.grid(which='both', linestyle='--', linewidth=0.5)
+
+    # Enlever les axes de droites et du haut
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['top'].set_visible(False)
+
+    # Centrer les axes en (0,0)
+    ax1.spines['left'].set_position(('data', t_min))
+    ax1.spines['bottom'].set_position(("data", 0))
+
+    #Afficher les flèches au bout des axes
+    ax1.plot(1, 0, ">k", transform=ax1.get_yaxis_transform(), clip_on=False)
+    ax1.plot(0, 1, "^k", transform=ax1.get_xaxis_transform(), clip_on=False)   
+    
+    # Nom des axex
+    ax1.set_xlabel('$t$', loc='right')
+    ax1.set_ylabel('$e_{train}$', loc='top', rotation='horizontal')
+
     plt.tight_layout()
     plt.show()
     plt.close()
@@ -786,3 +813,25 @@ def visualiser_histogrammes_2d_mnist_2(c_train):
 
     plt.show()
     plt.close()
+
+#---
+    
+### ----- CELLULES VALIDATION ----
+
+# N'exectuer que si en mode séquencé :
+if sequence:
+    # Question 1
+    validation_question_1 = Validation_values(8)
+
+    # Question 2
+    value_2 = x[14, 14].copy()
+    validation_question_2 = Validation_values(value_2)
+
+    # Question 3
+    value_3 = x[:, 11:24].copy()
+    validation_question_3 = Validation_lambda(lambda y: (value_3.shape == y.shape) and (y==value_3).all(),message_values = "❌ Ton code ne fonctionne pas, es-tu sûr(e) d'avoir un tableau de la bonne taille ?")
+
+    # Question 4
+    validation_question_4 = Validation_lambda(lambda y: y == 1 or y==-1,message_values = "❌ Ton code ne fonctionne pas, es-tu sûr(e) d'avoir bien rempli puis executé les deux cellules (cases de code) précédentes ? Attention à bien renvoyer -1 ou 1.")
+
+## --
