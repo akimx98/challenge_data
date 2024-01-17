@@ -158,7 +158,7 @@ def visualiser_scatter_2d_mnist_2(c_train, avec_centroides = False):
         for i in range(nb_digits):
             ax.scatter(M_x[i], M_y[i], marker = 'o', s = 70, edgecolor='black', linewidth=1.9, c=colors[i])
 
-    patches = [mpatches.Patch(color=colors[i], label="$\hat y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
     
     # Enlever les axes de droites et du haut
@@ -218,6 +218,13 @@ def tracer_separatrice(m, p, c_train):
     for i in range(nb_digits):  
         ax.scatter(c_train_par_population[i][:,0], c_train_par_population[i][:,1], marker = '+', s = 20, c=colors[i], linewidth=0.5)
 
+
+    # Définir les borne inf et sup des axes. On veut que le point (0,0) soit toujours sur le graphe
+    x_min, x_max = min(0, mins_[0]), max(0, maxs_[0])
+    y_min, y_max = min(0, maxs_[1]), max(0, maxs_[1])
+    ax.set_xlim((x_min, x_max))
+    ax.set_ylim((y_min, y_max))
+
     # Sauvegarde des limites actuelles
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
@@ -231,8 +238,25 @@ def tracer_separatrice(m, p, c_train):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-    patches = [mpatches.Patch(color=colors[i], label=classes[i]) for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
+    
+    # Enlever les axes de droites et du haut
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    # Centrer les axes en (0,0)
+    ax.spines['left'].set_position(('data', 0))
+    ax.spines['bottom'].set_position(("data", 0))
+
+    
+    #Afficher les flèches au bout des axes
+    ax.plot(1, 0, ">k", transform=ax.get_yaxis_transform(), clip_on=False)
+    ax.plot(0, 1, "^k", transform=ax.get_xaxis_transform(), clip_on=False)   
+    
+    # Nom des axex
+    ax.set_xlabel('$k_1$', loc='right')
+    ax.set_ylabel('$k_2$', loc='top', rotation='horizontal')
 
     plt.show()
     plt.close()
@@ -722,6 +746,56 @@ def tracer_erreur_c_train(t_min, t_max, c_train):
 #     plt.tight_layout()  # Ajuster l'affichage pour éviter tout chevauchement
 #     plt.show()
 #     plt.close()
+
+from tqdm.notebook import tqdm
+
+def grid_search(func, m_range, p_range, step_m, step_p, c_train):
+    """
+    Recherche les valeurs de m et p qui minimisent la fonction d'erreur.
+    
+    :param func: Fonction d'erreur à minimiser.
+    :param m_range: Tuple indiquant la plage de recherche pour m.
+    :param p_range: Tuple indiquant la plage de recherche pour p.
+    :param step_m: Pas de recherche pour m.
+    :param step_p: Pas de recherche pour p.
+    
+    :return: Tuple (m, p, min_error) où m et p minimisent la fonction d'erreur et min_error est l'erreur minimale.
+    """
+    
+    m_values = np.arange(m_range[0], m_range[1], step_m)
+    p_values = np.arange(p_range[0], p_range[1], step_p)
+    
+    min_error = 100
+    best_m, best_p = None, None
+    
+    total_iterations = len(m_values) * len(p_values)
+    pbar = tqdm(total=total_iterations, desc="Recherche du min ", dynamic_ncols=True)
+    
+    for m in m_values:
+        for p in p_values:
+            error = func(m, p, c_train, y_train)
+            if error < min_error:
+                min_error = error
+                best_m = m
+                best_p = p
+                
+            pbar.update(1)
+    
+    pbar.close()
+                
+    return round(best_m, 4), round(best_p, 4), round(min_error, 4)
+
+
+""" m_range=(0, 2)
+step_m=0.01
+
+p_range=(1, 10)
+step_p=0.5
+
+best_m, best_p, min_err = grid_search(erreur_lineaire, m_range, p_range, step_m, step_p, c_train)
+print(f"Meilleurs paramètres : m = {best_m}, p = {best_p} avec une erreur de {min_err}")
+tracer_separatrice(best_m, best_p, c_train) """
+
 
 
 
