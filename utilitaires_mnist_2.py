@@ -1,8 +1,13 @@
 # coding=utf-8
 
+###### VERSION 2/7 #####
+
+
 # Import des librairies utilisées dans le notebook
 import requests
 import numpy as np
+import sys
+import os
 import matplotlib.pyplot as plt
 import pickle
 from zipfile import ZipFile
@@ -11,13 +16,30 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-# Import de Basthon : ne marche que si on est sur basthon ou capytale, sinon ignorer : 
+
+### --- AJOUT DE TOUS LES SUBDIRECTIRIES AU PATH ---
+base_directory = os.path.abspath('.')
+
+# Using os.listdir() to get a list of all subdirectories
+subdirectories = [os.path.join(base_directory, d) for d in os.listdir(base_directory) if os.path.isdir(os.path.join(base_directory, d))]
+
+# Adding all subdirectories to the Python path
+sys.path.extend(subdirectories)
+
+### ---
+
+
+
+### --- IMPORT DE BASTHON ---
+# Ne marche que si on est sur basthon ou capytale, sinon ignorer : 
 try:
-    import basthon
+    import basthon  # Ne marche que si on est sur Capytale ou Basthon
+
 except ModuleNotFoundError: 
     pass
 
-# Import du validation_kernel : ne marche que si fourni et si va avec le notebook en version séquencé. Sinon, ignorer :
+### --- Import du validation_kernel ---
+# Ne marche que si fourni et si va avec le notebook en version séquencé. Sinon, ignorer :
 sequence = False
 
 try:
@@ -27,8 +49,11 @@ except ModuleNotFoundError:
     sequence = False
     pass
 
+# Définition fig matplolib
 plt.rcParams['figure.dpi'] = 150
 
+
+### --- IMPORT DES DONNÉES ---
 # Téléchargement et extraction des inputs contenus dans l'archive zip
 inputs_zip_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/input_mnist_2.zip"
 inputs_zip = requests.get(inputs_zip_url)
@@ -84,22 +109,31 @@ _, y_train_chiffres = [np.loadtxt(StringIO(output_train_chiffres.content.decode(
 x_train = x_train_2
 x_test = x_test_2
 
+# VERSION 2/7 : 
+y_train = y_train_chiffres
+classes = chiffres
+
 N = len(x_train)
 
 x_train_par_population = [x_train[y_train==k] for k in classes]
 
 x = x_train[0,:,:]
 
+def calcul_caracteristiques(x_train, caracteristique):
+    vec_caracteristique = np.vectorize(caracteristique, signature="(m,n)->()")
+    return vec_caracteristique(x_train)
+
 # Calculer l'estimation et l'erreur : 
-def erreur_train(x_train, y_train, t, classification):
-    n = len(x_train)
-    y_train_est = []
-    for i in range(n):
-        x = x_train[i]
-        y = y_train[i]
-        y_train_est.append(classification(x, t))
+def erreur_train(x_train, y_train, t, classification, caracteristique):
+    return erreur_train_optim(calcul_caracteristiques(x_train, caracteristique),y_train,t,classification)
+
+# Calculer l'estimation et l'erreur a partir du tableau de caractéristique des images : 
+def erreur_train_optim(k_x_train, y_train, t, classification):
+    # Vectorize the classification function if it's not already vectorized
+    y_train_est = np.vectorize(classification)(k_x_train,t)
     
-    return np.mean(np.array(y_train_est) != np.array(y_train))
+    # Calculate the mean error by comparing the estimated y values with the actual y_train values
+    return np.mean(y_train_est != y_train)
         
 
 # Erreurs
@@ -158,7 +192,7 @@ def visualiser_scatter_2d_mnist_2(c_train, avec_centroides = False):
         for i in range(nb_digits):
             ax.scatter(M_x[i], M_y[i], marker = 'o', s = 70, edgecolor='black', linewidth=1.9, c=colors[i])
 
-    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])) for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
     
     # Enlever les axes de droites et du haut
@@ -183,9 +217,10 @@ def visualiser_scatter_2d_mnist_2(c_train, avec_centroides = False):
     plt.close()
 
 def erreur_lineaire(m, p, c_train, y_train):
+    c_train = np.array(c_train)
     y_est_train = np.sign(m * c_train[:, 0] - c_train[:, 1] + p)
     erreurs = (y_est_train != y_train).astype(int)
-    return np.mean(erreurs)
+    return (100*np.mean(erreurs)).round(1)
 
 # def erreur_lineaire(m, p,c_train):
 #     liste_erreurs = []
@@ -238,7 +273,7 @@ def tracer_separatrice(m, p, c_train):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])+" (chiffre : "+str(chiffres[i])+")") for i in range(nb_digits)]
+    patches = [mpatches.Patch(color=colors[i], label="$y = $"+str(classes[i])) for i in range(nb_digits)]
     ax.legend(handles=patches,loc='upper left')
     
     # Enlever les axes de droites et du haut
@@ -317,8 +352,11 @@ def affichage_trente(images):
 
 # Sauver le .csv
 
+### VERSION 2/7 : on transforme les chiffres (2, 7) en classes (-1, 1) 
 def sauver_et_telecharger_mnist_2(y_est_test, nom_du_fichier):
-    np.savetxt(nom_du_fichier, np.stack([ID_test_2, y_est_test], axis=-1), fmt='%d', delimiter=',', header='ID,targets')
+    y_est_test = np.array(y_est_test) # To array
+    y_est_test_classes = np.where(y_est_test == 2, -1, np.where(y_est_test == 7, 1, y_est_test)) # From 2/7 to -1/1
+    np.savetxt(nom_du_fichier, np.stack([ID_test_2, y_est_test_classes], axis=-1), fmt='%d', delimiter=',', header='ID,targets')
     basthon.download(nom_du_fichier)
 
 def sauver_et_telecharger_mnist_4(y_est_test, nom_du_fichier):
@@ -644,16 +682,27 @@ def score(y_est, y_vrai):
 # Pour tracer la fonction erreur
 from matplotlib.ticker import AutoMinorLocator
 
-def tracer_erreur(t_min, t_max, func_classif):
+def tracer_erreur(t_min, t_max, func_classif, func_carac):
     pas_t = 2
     pas_x = 4
-    scores_list = []
-    for t in range(t_min, t_max, pas_t):
-        e_train = 100*erreur_train(x_train[::pas_x], y_train[::pas_x], t, func_classif)
-        scores_list.append(e_train)
+
+    # Create a range of t values using numpy's arange function
+    t_values = np.arange(t_min, t_max, pas_t)
+    
+    # Slice x_train and y_train using numpy's advanced slicing
+    x_train_sliced = x_train[::pas_x]
+    y_train_sliced = y_train[::pas_x]
+
+    k_x_train_sliced = calcul_caracteristiques(x_train_sliced, func_carac)
+    
+    # Vectorize the erreur_train function to apply it over an array of t_values
+    vec_erreur_train = np.vectorize(lambda t: 100 * erreur_train_optim(k_x_train_sliced, y_train_sliced, t, func_classif))
+    
+    # Apply the vectorized function to all t_values
+    scores_array = vec_erreur_train(t_values)
 
     fig, ax1 = plt.subplots(figsize=(7, 4))
-    ax1.scatter(np.arange(t_min, t_max, pas_t), scores_list, marker='+', zorder=3)
+    ax1.scatter(np.arange(t_min, t_max, pas_t), scores_array, marker='+', zorder=3)
     ax1.set_title("Erreur d'entrainement en fonction du paramètre seuil, MNIST 2 & 7")
     ax1.set_ylim(ymin=0, ymax=68)
     ax1.set_xlim(xmin=t_min, xmax=t_max+2)
@@ -905,7 +954,8 @@ if sequence:
     value_3 = x[:, 11:24].copy()
     validation_question_3 = Validation_lambda(lambda y: (value_3.shape == y.shape) and (y==value_3).all(),message_values = "❌ Ton code ne fonctionne pas, es-tu sûr(e) d'avoir un tableau de la bonne taille ?")
 
-    # Question 4
-    validation_question_4 = Validation_lambda(lambda y: y == 1 or y==-1,message_values = "❌ Ton code ne fonctionne pas, es-tu sûr(e) d'avoir bien rempli puis executé les deux cellules (cases de code) précédentes ? Attention à bien renvoyer -1 ou 1.")
+    # Question 4 
+    ### VERSION 2/7
+    validation_question_4 = Validation_lambda(lambda y: y == 2 or y==7,message_values = "❌ Ton code ne fonctionne pas, es-tu sûr(e) d'avoir bien rempli puis executé les deux cellules (cases de code) précédentes ? Attention à bien renvoyer 2 ou 7.")
 
 ## --
