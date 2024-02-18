@@ -16,6 +16,11 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.patches as mpatches
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
+try:
+    # For dev environment
+    from strings import *
+except ModuleNotFoundError: 
+    pass
 
 ### --- AJOUT DE TOUS LES SUBDIRECTIRIES AU PATH ---
 base_directory = os.path.abspath('.')
@@ -29,13 +34,14 @@ sys.path.extend(subdirectories)
 ### ---
 
 
-
 ### --- IMPORT DE BASTHON ---
 # Ne marche que si on est sur basthon ou capytale, sinon ignorer : 
 try:
     import basthon  # Ne marche que si on est sur Capytale ou Basthon
+    basthon = True
 
 except ModuleNotFoundError: 
+    basthon = False
     pass
 
 ### --- Import du validation_kernel ---
@@ -43,11 +49,13 @@ except ModuleNotFoundError:
 sequence = False
 
 try:
-    from validation_kernel import *
+    from capytale.autoeval import Validate
     sequence = True
+    Validate()() # Validate import cell
 except ModuleNotFoundError: 
     sequence = False
     pass
+
 
 # Définition fig matplolib
 plt.rcParams['figure.dpi'] = 150
@@ -117,7 +125,10 @@ N = len(x_train)
 
 x_train_par_population = [x_train[y_train==k] for k in classes]
 
-x = x_train[0,:,:]
+x = x_train[10,:,:]
+
+def print_error(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def calcul_caracteristiques(x_train, caracteristique):
     vec_caracteristique = np.vectorize(caracteristique, signature="(m,n)->()")
@@ -300,24 +311,49 @@ def titre_image(rng):
     titre = "y = "+str(y_train[rng])+" (chiffre = "+str(y_train_chiffres[rng])+")"
     return titre
 
+def outline_selected(ax, numero_ligne_debut=None, numero_ligne_fin=None, numero_colonne_debut=None, numero_colonne_fin=None):
+    if numero_ligne_debut is not None and numero_colonne_debut is not None and numero_ligne_fin is not None and numero_colonne_fin is not None:
+        if numero_ligne_debut < 1 or numero_colonne_debut < 1 or numero_ligne_fin > 28 or numero_colonne_fin > 28:
+            print_error("Les valeurs des index doivent être compris entre 1 et 28.")
+            return
+        if numero_ligne_debut > numero_ligne_fin or numero_colonne_debut > numero_colonne_fin:
+            print_error("La valeur de l'index de début doit être inférieure ou égale à celle de fin.")
+            return
+
+        padding = 0.2  # adjust this value as needed
+        rect = mpatches.Rectangle((numero_colonne_debut + padding, numero_ligne_debut + padding), 
+                                 numero_colonne_fin - numero_colonne_debut + 1 - 2 * padding, 
+                                 numero_ligne_fin - numero_ligne_debut + 1 - 2 * padding, 
+                                 fill=False, edgecolor='red', lw=2)
+        ax.add_patch(rect)
 
 # Affichage d'une image
-def affichage(image, titre=""):
+def affichage(image, numero_ligne_debut=None, numero_ligne_fin=None, numero_colonne_debut=None, numero_colonne_fin=None, titre=""):
+    if np.min(image) < 0 or np.max(image) > 255:
+        print_error("fonction affichage : Les valeurs des pixels de l'image doivent être compris entre 0 et 255.")
+        return
+
     fig, ax = plt.subplots(figsize=(3,3))
-    ax.imshow(image, cmap='gray')
+    ax.imshow(image, cmap='gray', vmin=0, vmax=255, extent=[1, image.shape[1] + 1, image.shape[0] + 1, 1])
     ax.set_title(titre)
+    outline_selected(ax, numero_ligne_debut, numero_ligne_fin, numero_colonne_debut, numero_colonne_fin)
+
     plt.show()
     plt.close()
 
+def creer_tableau(len_x, len_y):
+    return np.zeros((len_x, len_y))
+
 # Affichage 10 avec les valeurs de y en dessous
-def affichage_dix(images, liste_y = y_train):
+def affichage_dix(images, numero_ligne_debut=None, numero_ligne_fin=None, numero_colonne_debut=None, numero_colonne_fin=None, liste_y = y_train):
     global y_train
     fig, ax = plt.subplots(1, 10, figsize=(10, 1))
     
     # Cachez les axes des subplots
     for j in range(10):
         ax[j].axis('off')
-        ax[j].imshow(images[j], cmap='gray')
+        ax[j].imshow(images[j], cmap='gray', vmin=0, vmax=255, extent=[1, 29, 29, 1])
+        outline_selected(ax[j], numero_ligne_debut, numero_ligne_fin, numero_colonne_debut, numero_colonne_fin)
     
     # Affichez les classes
     if liste_y is not None:
@@ -942,7 +978,7 @@ def visualiser_histogrammes_2d_mnist_2(c_train):
 ### ----- CELLULES VALIDATION ----
 
 # N'exectuer que si en mode séquencé :
-if sequence:
+if sequence and False:
     # Question 1
     validation_question_1 = Validation_values(8)
 
