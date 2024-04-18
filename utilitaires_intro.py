@@ -7,7 +7,10 @@ print("Images chargées !")
 
 notebook_id = 1
 
-start_analytics_session(notebook_id)
+try:
+    start_analytics_session(notebook_id)
+except: 
+    pass
 
 try:
     # For dev environment
