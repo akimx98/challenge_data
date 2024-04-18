@@ -3,15 +3,9 @@ print("Chargement de la base donnée d'images en cours...")
 from utilitaires_mnist_2 import *
 from utilitaires_common import *
 
-print("Images chargées ! New.")
+print("Images chargées !")
 
 notebook_id = 1
-
-try:
-    start_analytics_session(notebook_id)
-    print("Session started")
-except: 
-    print("No analytics session")
 
 try:
     # For dev environment
