@@ -8,9 +8,10 @@ print("Images chargées !")
 notebook_id = 1
 
 try:
+    print("Session started")
     start_analytics_session(notebook_id)
 except: 
-    pass
+    print("No analytics session")
 
 try:
     # For dev environment
