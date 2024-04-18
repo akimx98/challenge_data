@@ -3,7 +3,7 @@ print("Chargement de la base donnée d'images en cours...")
 from utilitaires_mnist_2 import *
 from utilitaires_common import *
 
-print("Images chargées !")
+print("Images chargées ! New.")
 
 notebook_id = 1
 
