@@ -17,10 +17,19 @@ import pandas as pd
 
 from utilitaires_common import *
 
+plt.rcParams['figure.dpi'] = 200
+
 from IPython.display import display # Pour afficher des DataFrames avec display(df)
+
+# Pour afficher les dataframe pandas en HTML
+from IPython.display import display_html
+from itertools import chain, cycle
 
 ### --- IMPORT DES DONNÉES ---
 # Téléchargement et extraction des inputs contenus dans l'archive zip
+
+print("Chargement de la base de donnée d'images en cours...")
+
 inputs_zip_url = "https://raw.githubusercontent.com/akimx98/challenge_data/main/input_mnist_2.zip"
 inputs_zip = requests.get(inputs_zip_url)
 zf = ZipFile(BytesIO(inputs_zip.content))
@@ -47,7 +56,7 @@ with open('mnist_2_x_train.pickle', 'rb') as f:
     ID_train_2, d_train_2 = pickle.load(f).values()
 
 with open('mnist_2_x_test.pickle', 'rb') as f:
-    ID_test_2, x_test_2 = pickle.load(f).values()
+    ID_test_2, d_test_2 = pickle.load(f).values()
 
 # Outputs
 _, r_train = [np.loadtxt(StringIO(output_train.content.decode('utf-8')),
@@ -58,7 +67,7 @@ _, r_train_chiffres = [np.loadtxt(StringIO(output_train_chiffres.content.decode(
 
 # Ici le d_train c'est celui de MNIST-2
 d_train = d_train_2
-x_test = x_test_2
+d_test = d_test_2
 
 # VERSION 2/7 : 
 r_train = r_train_chiffres
@@ -69,6 +78,8 @@ N = len(d_train)
 d_train_par_population = [d_train[r_train==k] for k in classes]
 
 d = d_train[10,:,:].copy()
+
+print("Images chargées !")
 
 # Pour que ce soit défini une fois, au cas où l'élève n'excéuter pas la cellule def caractéristique
 y_petite_caracteristique = 7
@@ -81,11 +92,11 @@ def caracteristique(d):
     return k
 
 # Fonction répondant au problème en fonction de la caractéristique k de l'image que l'on doit classer
-def classification(k, t):
+def classification(k, x):
     global y_petite_caracteristique, y_grande_caracteristique
     """Fonction qui répond à la question : est-ce un 2 ou un 7 ?"""
     # Comparaison de la caractéristique au seuil t
-    if k < t:
+    if k < x:
         return y_petite_caracteristique
     else:
         return y_grande_caracteristique
@@ -96,14 +107,14 @@ def calcul_caracteristiques(d_train, caracteristique):
     return vec_caracteristique(d_train)
 
 # Calculer l'estimation et l'erreur : 
-def erreur_train(d_train, r_train, t, classification, caracteristique):
+def erreur_train(d_train, r_train, x, classification, caracteristique):
     """Fonction qui calcule l'erreur d'entraînement pour un seuil t donné"""
-    return erreur_train_optim(calcul_caracteristiques(d_train, caracteristique),r_train,t,classification)
+    return erreur_train_optim(calcul_caracteristiques(d_train, caracteristique),r_train,x,classification)
 
 # Calculer l'estimation et l'erreur a partir du tableau de caractéristique des images : 
-def erreur_train_optim(k_d_train, r_train, t, classification):
+def erreur_train_optim(k_d_train, r_train, x, classification):
     # Vectorize the classification function if it's not already vectorized
-    r_train_est = np.vectorize(classification)(k_d_train,t)
+    r_train_est = np.vectorize(classification)(k_d_train,x)
     
     # Calculate the mean error by comparing the estimated y values with the actual r_train values
     return np.mean(r_train_est != r_train)
@@ -164,7 +175,10 @@ def imshow(ax, image, **kwargs):
     ax.imshow(image, cmap='gray', vmin=0, vmax=255, extent=[0, 28, 28, 0], **kwargs)
 
 def outline_selected(ax, a=None, b=None, displayPoints=False, zoneName=None, zoneNamePos='right', nameA='A', nameB='B', color='red'):
-    if a is not None and b is not None:
+    if a is not None:
+        if b is None:
+            b = a
+            
         numero_ligne_debut = min(a[0], b[0])
         numero_ligne_fin = max(a[0], b[0])
         numero_colonne_debut = min(a[1], b[1])
@@ -175,6 +189,8 @@ def outline_selected(ax, a=None, b=None, displayPoints=False, zoneName=None, zon
             return
 
         padding = 0.2  # adjust this value as needed
+        if a == b:
+            padding = -0.1
         rect = mpatches.Rectangle((numero_colonne_debut + padding, numero_ligne_debut + padding), 
                                  numero_colonne_fin - numero_colonne_debut + 1 - 2 * padding, 
                                  numero_ligne_fin - numero_ligne_debut + 1 - 2 * padding, 
@@ -240,7 +256,7 @@ def affichage(image, a=None, b=None, displayPoints=False, titre=""):
     plt.show()
     plt.close()
 
-def affichage_2(image1, image2, A=None, B=None, displayPoints=False, titre1="", titre2=""):
+def affichage_2(image1, image2, A=None, B=None, displayPoints=False, titre1="", titre2="", histogramme=False):
     """Fonction qui affiche deux images côte à côté, avec un rectangle rouge délimité par les points A et B
         A : tuple (ligne, colonne) représentant le coin en haut à gauche du rectangle
         B : tuple (ligne, colonne) représentant le coin en bas à droite du rectangle
@@ -267,10 +283,18 @@ def affichage_2(image1, image2, A=None, B=None, displayPoints=False, titre1="", 
     ax[1].xaxis.tick_top()
     outline_selected(ax[1], A, B, displayPoints)
 
+    plt.tight_layout()
+
     plt.show()
     plt.close()
     
-    affichage_dix_caracteristique(a=A, b=B)
+    if histogramme:
+        affichage_dix_caracteristique(a=A, b=B, avec_df=False)
+        caracteristique = get_variable('caracteristique')
+        afficher_histogramme(caracteristique)
+    else:
+        affichage_dix_caracteristique(a=A, b=B)
+    
     return
 
 # Affichage d'une image sous forme de tableau
@@ -315,27 +339,35 @@ def affichage_tableau(image, a=None, b=None):
     display(df)
     return
 
-def affichage_dix_caracteristique(predictions=False, a=None, b=None):
+def affichage_dix_caracteristique(predictions=False, a=None, b=None, avec_df = True):
     affichage_dix(d_train, a, b)
-    df = pd.DataFrame()
-    df['$r$ (classe)'] = r_train[0:10]   
-    caracteristique = get_variable('caracteristique')
-    df['$k$ (caracteristique)'] = [caracteristique(d) for d in d_train[0:10]]
-    if predictions:
-        df['$\hat{r}$ (prediction)'] = '?'
-    df.index+=1
+    if avec_df:
+        df = pd.DataFrame()
+        df['$r$ (classe)'] = r_train[0:10]   
+        caracteristique = get_variable('caracteristique')
+        df['$k$ (caracteristique)'] = [caracteristique(d) for d in d_train[0:10]]
+        if predictions:
+            df['$\hat{r}$ (prediction)'] = '?'
+        df.index+=1
 
-    display(df)
+        display_html(df.to_html(index=False), raw=True)
     return
 
 # Affichage 10 avec les valeurs de y en dessous
-def affichage_dix(images, a=None, b=None, zones=[], liste_y = r_train, n=10):
+def affichage_dix(images=d_train, a=None, b=None, zones=[], liste_y = r_train, n=10, axes=False):
     global r_train
     fig, ax = plt.subplots(1, n, figsize=(n, 1))
     
     # Cachez les axes des subplots
     for j in range(n):
-        ax[j].axis('off')
+        if axes:
+            ax[j].set_xticks(np.arange(0,28,5))
+            ax[j].set_yticks(np.arange(0,28,5))
+            ax[j].xaxis.tick_top()
+            ax[j].tick_params(axis='both', which='major', labelsize=7)
+
+        else:
+            ax[j].axis('off')
         imshow(ax[j], images[j])
         outline_selected(ax[j], a, b)
         for zone in zones:
@@ -344,9 +376,9 @@ def affichage_dix(images, a=None, b=None, zones=[], liste_y = r_train, n=10):
     # Affichez les classes
     if liste_y is not None:
         for k in range(n):
-            fig.text((k+0.5)/10, 0, '$r = $'+str(liste_y[k]), va='top', ha='center', fontsize=12)
+            fig.text((k+0.5)/n, 0, '$r = $'+str(liste_y[k]), va='top', ha='center', fontsize=12)
     
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0.2, wspace=0.05, hspace=0)
+    plt.subplots_adjust(left=0, right=1.1, top=1, bottom=0.2, wspace=0.05, hspace=0)
     plt.show()
     plt.close()
 
@@ -390,7 +422,20 @@ def sauver_et_telecharger_mnist_10(y_est_test, nom_du_fichier):
     basthon.download(nom_du_fichier)
 
 # Visualiser les histogrammes
-def visualiser_histogrammes_mnist_2(c_train, size='grand', legend_loc='upper right'):
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+
+### VERSION 2 7
+
+def afficher_histogramme(caracteristique, seuil = None, legende_cachee=False):
+    # On vérife que 'seuil' est bien défini et n'est pas '...'
+    if not check_is_defined(seuil):
+        return
+
+    c_train = [caracteristique(d) for d in d_train]        
+    visualiser_histogrammes_mnist_2(c_train, pas = 10, mini_pas=2, x_min=0, grid=True, pas_y=50, seuil = seuil, legende_cachee=legende_cachee)
+
+# Visualiser les histogrammes
+def visualiser_histogrammes_mnist_2(c_train, x_min = None, x_max = None, y_max = None, pas_y = 100, legende_cachee = False, size='grand', legend_loc='upper right', legende_y = '\n Nombre d\'images\nde caractéristique $k$', thick_ticks=False, pas = 25, mini_pas = 5, grid=False, seuil=None):
     if size == 'grand':
         font_size = 14
     elif size == 'petit':
@@ -398,6 +443,11 @@ def visualiser_histogrammes_mnist_2(c_train, size='grand', legend_loc='upper rig
     else:
         raise ValueError("size doit valoir 'grand' ou 'petit'") 
     
+    if x_min is None:
+        x_min = int(min(c_train)/pas)*pas
+    
+    if x_max is None:
+        x_max = int(max(c_train)/pas)*pas+pas
     
     nb_digits = len(chiffres)
     c_train_par_population = [np.array(c_train)[r_train==k] for k in classes]
@@ -405,40 +455,96 @@ def visualiser_histogrammes_mnist_2(c_train, size='grand', legend_loc='upper rig
     # Deux premières couleurs par défaut de Matplotlib
     colors = ['C0', 'C1']
 
-    fig, ax = plt.subplots(figsize=(8,5))
+    fig, ax = plt.subplots(figsize=(8,3))
     # Visualisation des histogrammes
-    for k in range(nb_digits):
-        ax.hist(c_train_par_population[k], bins=60, alpha=0.7, density = False, 
-                label="$y = $"+str(classes[k])+" (chiffre : "+str(chiffres[k])+")")
+    labels_hist = ['$h$', '$g$']
 
-    ax.set_xlim(xmin=0)
-    #ax.set_ylim(ymax = 395)
+    # Création des bins :
+    bins = np.arange(x_min, x_max+1, mini_pas)
+
+    max_histo = []
+    for k in range(nb_digits):
+        #if legende_h_g:
+        #label = labels_hist[k]+" ($y=$"+str(chiffres[k])+")"
+        
+        if legende_cachee:
+            label = "$r=$ ?"
+        else:
+            label = "$r=$ "+str(chiffres[k])
+        
+        histo = ax.hist(c_train_par_population[k], bins=bins, alpha=0.7, density=False, 
+            label=label, edgecolor='black')
+        max_histo.append(max(histo[0]))
+    
+    if y_max is None:
+        y_max = max(max_histo)+0.1*max(max_histo)
+
+    ax.set_xlim(xmin=x_min)
+    ax.set_xlim(xmax=x_max)
+    ax.set_ylim(ymax = y_max)
     #ax.set_title("Histogrammes de la caractéristique")
+    
     ax.legend(loc=legend_loc, fontsize=font_size+2)
     
+    # Ticks principaux et secondaires sur x
+    ax.xaxis.set_major_locator(MultipleLocator(pas))
+    ax.xaxis.set_minor_locator(MultipleLocator(mini_pas))
+
+    # Ticks principaux et secondaires sur y
+    ecart = int((y_max//10)/pas_y)*pas_y+pas_y
+    #ecart = 100
+    ax.yaxis.set_major_locator(MultipleLocator(ecart))
+    ax.yaxis.set_minor_locator(MultipleLocator(ecart//5))
+
     # Font size pour les ticks
     ax.tick_params(axis='both', labelsize=font_size)
+    # Ticks épais si demandé:
+    if thick_ticks:
+        ax.tick_params(which='major', length=8, color='black', width=2.5)
+        ax.tick_params(which='minor', length=5, color='black', width=1.5)
 
     # Enlever les axes de droites et du haut
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     
     # Centrer les axes en (0,0)
-    ax.spines['left'].set_position(('data', 0))
+    ax.spines['left'].set_position(('data', x_min))
     ax.spines['bottom'].set_position(("data", 0))
 
     
     #Afficher les flèches au bout des axes
     ax.plot(1, 0, ">k", transform=ax.get_yaxis_transform(), clip_on=False)
-    ax.plot(0, 1, "^k", transform=ax.get_xaxis_transform(), clip_on=False)   
+    ax.plot(x_min, 1, "^k", transform=ax.get_xaxis_transform(), clip_on=False)   
     
     # Nom des axex
     ax.set_xlabel('$k$', loc='right', fontsize=font_size)
-    ax.set_ylabel('$h$ et $g$', loc='top', rotation='horizontal', fontsize=font_size)
+    #if legende_h_g:
+    #ax.set_ylabel('$h$ et $g$', loc='top', rotation='horizontal', fontsize=font_size)
+    
+    ax.set_ylabel(legende_y, rotation='horizontal', horizontalalignment='left', fontsize=font_size-4, labelpad=-180)
+    ax.yaxis.set_label_coords(0.025, 0.95)
+
+    if grid:
+        ax.set_axisbelow(True)
+        ax.grid(axis='y', linestyle='--', alpha=0.5, which='major')
+        
+    if seuil is not None:
+        global e_train
+        erreur = 100*erreur_train_optim(c_train, r_train, seuil, classification)
+        e_train = erreur
+
+        # Show the error value as the title of the plot
+        ax.set_title(f"Erreur associée à ce seuil = {erreur:.2f}%", fontsize=font_size)
+
+        # Show the threshold as a vertical line
+        ax.axvline(x=seuil, color='black', linestyle='--', linewidth=3)
+
+    plt.tight_layout()
+        
 
     plt.show()
     plt.close()
-
+    #print(x_min, x_max, y_max)
 
 # Visualiser les histogrammes
 def visualiser_histogrammes_mnist_4(c_train_par_population):
@@ -752,8 +858,8 @@ def tracer_erreur(func_classif, func_carac):
 
     
     # Nom des axex
-    ax1.set_xlabel('$t$', loc='right')
-    ax1.set_ylabel('$e_{train}$', loc='top', rotation='horizontal')
+    ax1.set_xlabel('Seuil $x$', loc='right')
+    ax1.set_ylabel('$Erreur f(x)$', loc='top', rotation='horizontal')
 
     plt.tight_layout()
     plt.show()
@@ -993,3 +1099,198 @@ def estim(d):
     x = get_variable('x')
 
     return classification(caracteristique(d), x)
+
+def get_estimations(images, algorithme=None):
+    if algorithme is None:
+        algorithme = get_algorithme_func()
+    if not algorithme:
+        return None
+
+    r_prediction = np.vectorize(algorithme, signature="(m,n)->()")(images)
+    return r_prediction
+    
+def calculer_score(algorithme, method=None, parameters=None, cb=None, a=None, b=None):
+
+    if sequence:
+        set = d_test
+    else:
+        print("Mode DEV : Calcul du score sur d_train")
+        set = d_train
+    
+    try:
+        print("Calcul du score en cours...")
+
+        def internal_cb(data):
+            # Montre des exemples d'erreur avec d_train
+            errors = []
+            r_errors = []
+            success = []
+            r_success = []
+
+            i = 0
+            random_indices = np.random.permutation(len(d_train)) # Parcourt d_train dans un ordre random pour ne pas montrer toujours les mêmes exemples
+            while (len(errors) < 5 or len(success) < 5) and i < len(random_indices):
+                img_index = random_indices[i]
+                if algorithme(d_train[img_index]) == r_train[img_index]:
+                    if len(success) < 5:
+                        success.append(d_train[img_index])
+                        r_success.append(r_train[img_index])
+                else:
+                    if len(errors) < 5:
+                        errors.append(d_train[img_index])
+                        r_errors.append(r_train[img_index])
+                
+                i += 1
+                    
+            print("Voici quelques images que ton algorithme a mal classé :")
+            affichage_dix(errors, liste_y=r_errors, n=len(errors), a=a, b=b)
+
+            print("Et des images bien classées : ")
+            affichage_dix(success, liste_y=r_success, n=len(success), a=a, b=b)
+
+            if cb is not None:
+                cb(data)
+
+        r_prediction = get_estimations(set, algorithme=algorithme)
+        if r_prediction is None:
+            return 
+
+        if not sequence:
+            score = np.mean(r_prediction != r_train)
+            set_score(score)
+            internal_cb(score)
+            return
+
+        r_prediction_classes = np.where(r_prediction == 2, -1, np.where(r_prediction == 7, 1, r_prediction)) # From 2/7 to -1/1
+        buffer = StringIO()
+        np.savetxt(buffer, np.stack([ID_test_2, r_prediction_classes], axis=-1), fmt='%d', delimiter=',', header='ID,targets')
+        buffer.seek(0)
+
+        submit(buffer, method=method, parameters=parameters, cb=internal_cb)
+
+    except Exception as e:
+        print_error("Il y a eu une erreur lors du calcul du score. Vérifie ta réponse.")
+        if debug:
+            raise(e)
+
+def calculer_score_etape_1():
+    algorithme = get_algorithme_func()
+    if algorithme is None:
+        return
+    
+    def cb(score):
+        validation_score_fixe()
+
+    calculer_score(algorithme, method="fixed", cb=cb) 
+
+def get_algorithme_func(error=None):
+    if has_variable('algorithme'):
+        algorithme = get_variable('algorithme')
+    else:
+        algorithme = None
+        
+    if algorithme is None or not callable(algorithme):
+        if error:
+            print_error(error)
+        else:
+            print_error("Vous avez remplacé autre chose que les ... . Revenez en arrière avec le raccourci clavier Ctrl+Z pour annuler vos modifications.")
+        return None
+
+    return algorithme
+    
+        
+def check_pixel_coordinates(coords, errors):
+    if not isinstance(coords, tuple) or len(coords) != 2:
+        errors.append("Les coordonnées du pixel doivent être entre parenthèses séparées par une virgule. Exemple :")
+        errors.append("(0, 0)")
+        return False
+    if coords[0] is Ellipsis or coords[1] is Ellipsis:
+        errors.append("Tu n'as pas remplacé les ...")
+        return False
+    if not isinstance(coords[0], int) or not isinstance(coords[1], int):
+        errors.append("Les coordonnées du pixel doivent être des nombres entiers.")
+        return False
+    if coords[0] < 0 or coords[0] > 27 or coords[1] < 0 or coords[1] > 27:
+        errors.append("Les coordonnées du pixel doivent être entre 0 et 27.")
+        return False
+    return True
+    
+### Validation cellules ###
+
+def validate_algo(errors, answers):
+    r_prediction = get_estimations(d_test)
+    # check that all answers are 2 or 7
+    if not np.all(np.logical_or(r_prediction == 2, r_prediction == 7)):
+        non_matching = np.where(np.logical_and(r_prediction != 2, r_prediction != 7))
+        first_non_matching = r_prediction[non_matching][0]
+        if first_non_matching is Ellipsis:
+            errors.append("Votre n'avez pas remplacé les ... dans la fonction algorithme")
+        else:
+            errors.append("Votre algorithme a répondu autre chose que 2 ou 7 : " + str(first_non_matching))
+        return False
+    
+    return True 
+
+def validation_func_score_fixed(errors, answers):     
+    score_10 = answers['score_10']
+    algorithme = get_algorithme_func(error="La fonction algorithme n'existe plus. Revenez en arrière et réexecutez la cellule avec 'def algorithme(d): ...'")
+    if not score_10 or not algorithme:
+        return False
+    
+    estimations = [algorithme(d) for d in d_train[0:10]]
+    nb_errors = np.sum(estimations != r_train[0:10])
+
+    if not isinstance(score_10, int):
+        errors.append("La variable score_10 doit être un entier. Attention, écrivez uniquement le nombre sans le %.")
+        return False
+
+    if score_10 == nb_errors * 10:
+        print(f"Bravo, ton algorithme actuel a fait {nb_errors} erreurs sur les 10 premières images, soit {score_10}% d'erreur")
+        return True
+    
+    if score_10 == nb_errors:
+        errors.append("Ce n'est pas la bonne valeur. Tu as donné le nombre d'erreur et non le pourcentage d'erreur.")
+    elif score_10 < 0 or score_10 > 100:
+        errors.append("Ce n'est pas la bonne valeur. Le pourcentage d'erreur doit être compris entre 0 et 100.")
+    else:
+        errors.append("Ce n'est pas la bonne valeur. Note la réponse donnée par ton algorithme pour chaque image et compte le nombre de différences avec les bonnes réponses.")
+    
+    return False
+
+def validate_pixel_noir(errors, answers):
+    answers['pixel'] = int(d[17][15])
+    if d[17][15] == 0:
+        return True
+    elif d[17][15] == 254:
+        errors.append("Tu n'as pas changé la valeur du pixel, il vaut toujours 254")
+    else:
+        errors.append("Tu as bien changé la valeur mais ce n'est pas la bonne. Relis l'énoncé pour voir la valeur à donner pour un pixel noir.")
+    return False
+ 
+validation_algorithme_fixe = MathadataValidate(function_validation=validate_algo, success="Votre algorithme est valide. Il a bien répondu 2 ou 7 pour toutes les images !")
+validation_execution_calcul_score = MathadataValidate(success="")
+validation_question_score_fixe = MathadataValidateVariables({
+    'score_10': None
+}, function_validation=validation_func_score_fixed, success="")
+validation_score_fixe = MathadataValidate(success="")
+validation_execution_affichage = MathadataValidate(success="")
+validation_question_pixel = MathadataValidateVariables({
+    'pixel': {
+        'value': int(d[15,17]),
+        'errors': [
+            {
+                'value': {
+                    'min': 0,
+                    'max': 255
+                },
+                'else': "Ta réponse n'est pas bonne. Les pixels peuvent uniquement avoir des valeurs entre 0 et 255."
+            },
+            {
+                'value': int(d[17,15]),
+                'else': "Attention ! Les coordonnées sont données en (ligne, colonne)."
+            }
+        ]
+    }
+})
+validation_question_pixel_noir = MathadataValidate(success="Bravo, le pixel est devenu noir", function_validation=validate_pixel_noir)
+validation_question_moyenne = MathadataValidateVariables({'k': np.mean(d[14:16,15:17])}, success="Bravo, la moyenne vaut en effet (142 + 154 + 0 + 0) / 4 = 74")

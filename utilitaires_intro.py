@@ -1,11 +1,9 @@
-print("Chargement de la base donnée d'images en cours...")
-
 from utilitaires_mnist_2 import *
 from utilitaires_common import *
 
-print("Images chargées !")
+notebook_id = 4
 
-notebook_id = 1
+start_analytics_session(notebook_id)
 
 try:
     # For dev environment
@@ -13,9 +11,77 @@ try:
 except ModuleNotFoundError: 
     pass
 
+def calculer_score_zone_custom(): 
+    global e_train
+    x = get_variable('x')
+    r_petite_caracteristique = get_variable('r_petite_caracteristique')
+    r_grande_caracteristique = get_variable('r_grande_caracteristique')
+    caracteristique = get_variable('caracteristique')
+
+    if not check_is_defined(x) or not check_is_defined(r_petite_caracteristique) or not check_is_defined(r_grande_caracteristique):
+        return
+
+    def algorithme(d):
+        k = caracteristique(d)
+        if k < x:
+            return r_petite_caracteristique
+        else:
+            return r_grande_caracteristique
+    
+    def cb(score):
+        validation_score_zone_custom()
+
+    calculer_score(algorithme, method="moyenne custom", parameters=f"x={x}", cb=cb) 
+
+def calculer_score_moyenne():
+    x = get_variable('x')
+    r_petite_caracteristique = get_variable('r_petite_caracteristique')
+    r_grande_caracteristique = get_variable('r_grande_caracteristique')
+    caracteristique = get_variable('caracteristique')
+
+    if not check_is_defined(x) or not check_is_defined(r_petite_caracteristique) or not check_is_defined(r_grande_caracteristique):
+        return
+
+    def algorithme(d):
+        k = caracteristique(d)
+        if k < x:
+            return r_petite_caracteristique
+        else:
+            return r_grande_caracteristique
+    
+    def cb(score):
+        validation_score_moyenne()
+
+    calculer_score(algorithme, method="moyenne ref", parameters=f"x={x}", cb=cb) 
+
+def calculer_score_hist_seuil():
+    x = get_variable('x')
+    r_petite_caracteristique = get_variable('r_petite_caracteristique')
+    r_grande_caracteristique = get_variable('r_grande_caracteristique')
+    caracteristique = get_variable('caracteristique')
+
+    if not check_is_defined(x) or not check_is_defined(r_petite_caracteristique) or not check_is_defined(r_grande_caracteristique):
+        return
+    
+    if x > 35 or x < 33:
+        print_error("Trouve un seuil x qui donne un score inférieur à 31% pour continuer.")
+        return
+    
+    def algorithme(d):
+        k = caracteristique(d)
+        if k < x:
+            return r_petite_caracteristique
+        else:
+            return r_grande_caracteristique
+    
+    def cb(score):
+        validation_question_hist_seuil()
+
+    calculer_score(algorithme, method="moyenne ref hist", parameters=f"x={x}", cb=cb) 
+
 ### ----- CELLULES VALIDATION ----
 
-class Validate2(MathadataValidate):
+class ValidatePixelNoir(MathadataValidate):
     def __init__(self):
         super().__init__(success="Bravo, le pixel (17,15) est devenu noir !")
 
@@ -28,6 +94,31 @@ class Validate2(MathadataValidate):
         else:
             errors.append("Tu as bien changé la valeur mais ce n'est pas la bonne. Relis l'énoncé pour voir la valeur à donner pour un pixel noir.")
         return False
+
+class ValidateScorePixel(MathadataValidateVariables):
+    def __init__(self):
+        super().__init__({'coordonnees_pixel': None}, success="")
+    
+    def validate(self, errors, answers):
+        if not super().validate(errors, answers):
+            return False
+        if not check_pixel_coordinates(answers['coordonnees_pixel'], errors):
+            return False
+        algorithme = get_algorithme_func()
+        if not algorithme:
+            return False
+
+        def cb(score):
+            if score <= 0.4:
+                print("Bravo, tu as trouvé un pixel qui te donne un score de 40% ou moins ! Tu peux passer à la suite")
+                MathadataValidate()()
+            else:
+                print_error("Change les coordonnées de ton pixel pour obtenir un score de 40% ou moins.")
+                
+
+        calculer_score(algorithme, method="one pixel", cb=cb, a=answers['coordonnees_pixel'], b=answers['coordonnees_pixel']) 
+        return False
+        
 
 class Validate7(MathadataValidate):
     def validate(self, errors, answers):
@@ -87,7 +178,11 @@ class Validate8(MathadataValidate):
 if sequence:
     
     @validationclass
-    class Validate2(Validate2):
+    class ValidatePixelNoir(ValidatePixelNoir):
+        pass
+
+    @validationclass
+    class ValidateScorePixel(ValidateScorePixel):
         pass
 
     @validationclass
@@ -97,22 +192,11 @@ if sequence:
     @validationclass
     class Validate8(Validate8):
         pass
-        
-validation_question_1 = MathadataValidateVariables({
-    'pixel': {
-        'value': int(d[15,17]),
-        'errors': [
-            {
-                'value': {
-                    'min': 0,
-                    'max': 255
-                },
-                'else': "Ta réponse n'est pas bonne. Les pixels peuvent uniquement avoir des valeurs entre 0 et 255."
-            }
-        ]
-    }
-})
-validation_question_2 = Validate2()
+
+
+
+validation_score_pixel = ValidateScorePixel()
+
 validation_question_3 = MathadataValidateVariables({
     'r': {
         'value': 2,
@@ -126,7 +210,6 @@ validation_question_3 = MathadataValidateVariables({
         ]
     }
 })
-validation_question_4 = MathadataValidateVariables({'k': np.mean(d[14:16,15:17])}, success="Bravo, la moyenne vaut en effet (142 + 154 + 0 + 0) / 4 = 74")
 validation_question_5 = MathadataValidateVariables({'r_petite_caracteristique': 7, 'r_grande_caracteristique': 2}, success="Bravo, la moyenne est en effet plus élevée pour les images de 2 que de 7")
 validation_question_6 = MathadataValidateVariables({
     'x': {
@@ -136,6 +219,7 @@ validation_question_6 = MathadataValidateVariables({
         }
     }
 }, success="Ton seuil est correct ! Il n'est pas forcément optimal, on verra dans la suite comment l'optimiser.")
+
 validation_question_7 = Validate7()
 validation_question_8 = Validate8()
 validation_question_9 = MathadataValidateVariables({
@@ -151,7 +235,7 @@ validate_moyenne_partie_image = MathadataValidateVariables({
     'e_train': {
         'value': {
             'min': 0,
-            'max': 0.12
+            'max': 12
         },
         'errors': [
             {
@@ -164,6 +248,112 @@ validate_moyenne_partie_image = MathadataValidateVariables({
     }
 }, success="Bravo ! Tu as réussi à réduire l'erreur à moins de 12%. C'est déjà un très bon score ! Tu peux continuer à essayer d'améliorer ta zone ou passer à la suite.")
 
+## Validation des questions Stat
+
+# Les success
+def on_success_hist_1(answers):
+    afficher_histogramme(caracteristique)
+
+validation_question_hist_1 = MathadataValidateVariables({
+    'r_histogramme_orange': {
+        'value': 7,
+        'errors': [
+            {
+                'value': {
+                    'in': [2, 7],
+                },
+                'else': "r_histogramme_orange n'a pas la bonne valeur. Tu dois répondre par 2 ou 7."
+            }
+        ]
+    },
+    'r_histogramme_bleu': {
+        'value': 2,
+        'errors': [
+            {
+                'value': {
+                    'in': [2, 7],
+                },
+                'else': "r_histogramme_bleu n'a pas la bonne valeur. Tu dois répondre par 2 ou 7."
+            }
+        ]
+    }
+}, success="C'est la bonne réponse ! Les images de 7 ont souvent moins de pixels blancs que les images de 2. C'est pourquoi leur caractéristique est souvent plus petite.", on_success=on_success_hist_1)
+
+validation_question_hist_2 = MathadataValidateVariables({
+    'nombre_2': {
+        'value': {
+            'min': 47,
+            'max': 50
+        },
+        'errors': [
+            {
+                'value': {
+                    'min': 0,
+                    'max': 350
+                },
+                'else': "nombre_2 n'a pas la bonne valeur. As-tu bien remplacé les ... par le nombre d'image de 2 avec une caractéristique entre 20 et 22 ?"
+            }
+        ]
+    },
+    'nombre_7': {
+        'value': {
+            'min': 220,
+            'max': 240
+        },
+        'errors': [
+            {
+                'value': {
+                    'min': 0,
+                    'max': 350
+                },
+                'else': "nombre_7 n'a pas la bonne valeur. As-tu bien remplacé les ... par le nombre d'image de 7 avec une caractéristique entre 20 et 22 ?"
+            }
+        ]
+    },
+}, success="C'est la bonne réponse !")
+
+validation_question_hist_3 = MathadataValidateVariables({
+    'nombre_2_inf_20': {
+        'value': {
+            'min': 50,
+            'max': 70
+        },
+        'errors': [
+            {
+                'value': {
+                    'min': 10,
+                    'max': 100
+                },
+                'else': "nombre_2_inf_20 n'a pas la bonne valeur. As-tu bien remplacé les ... par le nombre d'image de 2 avec une caractéristique inférieure à 20 ?"
+            }
+        ]
+    },
+    'nombre_7_inf_20': {
+        'value': {
+            'min': 290,
+            'max': 330
+        },
+        'errors': [
+            {
+                'value': {
+                    'min': 100,
+                    'max': 400
+                },
+                'else': "nombre_7_inf n'a pas la bonne valeur. As-tu bien remplacé les ... par le nombre d'image de 7 avec une caractéristique inférieure à 20 ?"
+            }
+        ]
+    },
+}, success="C'est la bonne réponse !")
+
+validation_question_hist_seuil = MathadataValidateVariables({
+    'x': {
+        'value': {
+            'min': 33,
+            'max': 35
+        }
+    }
+}, success="Bravo, ton seuil est maintenant optimal !")
+
 ### Pour les checks d'execution des cellules sans réponse attendue:
 validation_execution_1 = MathadataValidate(success="")
 validation_execution_2 = MathadataValidate(success="")
@@ -173,3 +363,6 @@ validation_execution_5 = MathadataValidate(success="")
 validation_execution_6 = MathadataValidate(success="")
 validation_execution_7 = MathadataValidate(success="")
 validation_execution_classif = MathadataValidate(success="")
+validation_execution_caracteristique_custom = MathadataValidate(success="")
+validation_score_moyenne = MathadataValidate(success="")
+validation_score_zone_custom = MathadataValidate(success="")
